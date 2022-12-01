@@ -1,0 +1,54 @@
+import pandas as pd
+import requests
+
+r = requests.get('http://api.nobelprize.org/v1/laureate.json')
+r1 = requests.get('http://api.nobelprize.org/v1/country.json')
+nested_r = r.json()
+nested_r1 = r1.json()
+
+data_new = nested_r['laureates']
+data_country = nested_r1['countries']
+
+data = pd.json_normalize(data_new)
+data_count = pd.json_normalize(data_country)
+data = data[['id', 'born', 'gender', 'firstname', 'surname', 'bornCountryCode']]
+data_count = data_count[['code', 'name']]
+
+data['Name'] = data['firstname'].fillna("") + ' ' + data['surname'].fillna("")
+data_old = data[['id', 'born', 'gender', 'Name', 'bornCountryCode']]
+print(data_old)
+
+key = list(data_new[0].keys())
+
+for key, val in data_new.items():
+    for i in val:
+        print("{} : {}".format(key, i))
+
+data_new_set = data_new.keys()
+res = list(set(val for dic in data_new_set for val in dic.values()))
+
+compareColumn = []
+for index, row in data.iterrows():
+    data_count = data_count[data_count["code"] == row["bornCountryCode"]]
+    if data_count.shape[0] == 0:
+        compareColumn.append(" ")
+    else:
+        check = False
+        for jndex, row2 in data_count.iterrows():
+            if row2["code"] == row["bornCountryCode"]:
+                compareColumn.append(data_count["name"])
+                check = True
+                break
+        if not check:
+            compareColumn.append(" ")
+data["country"] = compareColumn
+
+print(data["country"])
+
+data_count.rename(columns = {'name':'bornCountryCode'}, inplace = True)
+print(data_count)
+
+dfinal = data_old.merge(data_count, on="bornCountryCode", how = 'inner')
+print(dfinal)
+
+dfinal.to_csv('file_name.csv', index=False)
